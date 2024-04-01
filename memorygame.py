@@ -3,6 +3,7 @@ import random
 
 # Initialize Pygame
 pygame.init()
+pygame.mixer.init()  # Initialize the mixer module
 
 # Screen dimensions
 screen_width = 700
@@ -16,6 +17,9 @@ background_color = (255, 255, 255)
 colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
 colors *= 2  # Duplicate colors for pairs
 
+# Sounds
+match_sound = pygame.mixer.Sound('Win.wav')  # For a successful match
+
 # Positions and sizes
 grid_size = (4, 3)  # 4 columns, 3 rows
 rect_width = screen_arena_width // grid_size[0]
@@ -27,7 +31,7 @@ selected = []  # Keep track of rectangles that are currently selected
 matched = []  # Keep track of rectangles that have been matched
 running = True
 revealed = [False] * len(rects)  # Keep track of which rectangles are currently revealed
-game_end = True
+game_end = False
 
 # Shuffle the colors
 random.shuffle(colors)
@@ -49,6 +53,7 @@ while running:
                     revealed[i] = True
                     if len(selected) == 2 and colors[selected[0]] == colors[selected[1]]:
                         matched.extend(selected)
+                        match_sound.play()  # Play sound on match
                         selected = []
                     elif len(selected) == 2:
                         pygame.time.wait(500)  # Wait half a second
@@ -67,9 +72,9 @@ while running:
             pygame.draw.rect(screen, (0, 0, 0), rect)  # Draw hidden rectangle
 
     # Timer display
-    if(not game_end):
-        elapsed_ticks = pygame.time.get_ticks() - start_ticks
-        elapsed_seconds = elapsed_ticks // 1000  # Convert milliseconds to seconds
+    # if(not game_end):
+    elapsed_ticks = pygame.time.get_ticks() - start_ticks
+    elapsed_seconds = elapsed_ticks // 1000  # Convert milliseconds to seconds
     timer_text = f'Time: {elapsed_seconds // 60}:{elapsed_seconds % 60:02}'  # Format: "Time: M:SS"
     timer_surface = font.render(timer_text, True, (0, 255, 0))
     screen.blit(timer_surface, (5, 5))  # Position the timer at the top-left corner
