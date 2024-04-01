@@ -66,15 +66,18 @@ while running:
     for i, rect in enumerate(rects):
         if revealed[i] or i in matched:
             pygame.draw.rect(screen, colors[i], rect)
-            game_end = True
         else:
-            game_end = False
             pygame.draw.rect(screen, (0, 0, 0), rect)  # Draw hidden rectangle
 
+    if len(matched) == len(rects) and not game_end:
+        game_end = True
+        elapsed_ticks = pygame.time.get_ticks() - start_ticks
+        elapsed_seconds = elapsed_ticks // 1000  # Convert milliseconds to seconds
+
     # Timer display
-    # if(not game_end):
-    elapsed_ticks = pygame.time.get_ticks() - start_ticks
-    elapsed_seconds = elapsed_ticks // 1000  # Convert milliseconds to seconds
+    if(not game_end):
+        elapsed_ticks = pygame.time.get_ticks() - start_ticks
+        elapsed_seconds = elapsed_ticks // 1000  # Convert milliseconds to seconds
     timer_text = f'Time: {elapsed_seconds // 60}:{elapsed_seconds % 60:02}'  # Format: "Time: M:SS"
     timer_surface = font.render(timer_text, True, (0, 255, 0))
     screen.blit(timer_surface, (5, 5))  # Position the timer at the top-left corner
