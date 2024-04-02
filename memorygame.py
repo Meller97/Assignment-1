@@ -1,5 +1,6 @@
 import pygame
 import random
+import time
 
 # Initialize Pygame
 pygame.init()
@@ -32,6 +33,8 @@ matched = []  # Keep track of rectangles that have been matched
 running = True
 revealed = [False] * len(rects)  # Keep track of which rectangles are currently revealed
 game_end = False
+waiting_to_hide = False
+last_check_time = 0
 
 # Shuffle the colors
 random.shuffle(colors)
@@ -42,24 +45,30 @@ font = pygame.font.Font("digital-7.ttf", 36)
 
 # Main game loop
 while running:
+    current_time = time.time()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN and len(selected) < 2:
+        elif event.type == pygame.MOUSEBUTTONDOWN and len(selected) < 2 and not waiting_to_hide:
             mouse_pos = event.pos
             for i, rect in enumerate(rects):
                 if rect.collidepoint(mouse_pos) and i not in matched and i not in selected:
                     selected.append(i)
                     revealed[i] = True
-                    if len(selected) == 2 and colors[selected[0]] == colors[selected[1]]:
-                        matched.extend(selected)
-                        match_sound.play()  # Play sound on match
-                        selected = []
-                    elif len(selected) == 2:
-                        pygame.time.wait(500)  # Wait half a second
-                        for idx in selected:
-                            revealed[idx] = False
-                        selected = []
+                    if len(selected) == 2:
+                        if colors[selected[0]] != colors[selected[1]]:
+                            waiting_to_hide = True
+                            last_check_time = current_time
+                        else:
+                            match_sound.play()
+                            matched.extend(selected)
+                            selected = []
+    
+    if waiting_to_hide and current_time - last_check_time >= 0.5:  # 0.5 seconds passed
+        for i in selected:
+            revealed[i] = False
+        selected = []
+        waiting_to_hide = False
 
     screen.fill(background_color)
 
