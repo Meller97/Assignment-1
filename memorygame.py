@@ -26,7 +26,7 @@ flip_sound = pygame.mixer.Sound('flip_sound.wav')
 grid_size = (4, 3)  # 4 columns, 3 rows
 rect_width = screen_arena_width // grid_size[0]
 rect_height = screen_arena_height // grid_size[1]
-rects = [pygame.Rect(x * rect_width +50, y * rect_height + 50, rect_width, rect_height) for x in range(grid_size[0]) for y in range(grid_size[1])]
+rects = [pygame.Rect(x * rect_width + 50, y * rect_height + 50, rect_width-20, rect_height-20) for x in range(grid_size[0]) for y in range(grid_size[1])]
 
 # Game variables
 selected = []  # Keep track of rectangles that are currently selected
@@ -36,6 +36,7 @@ revealed = [False] * len(rects)  # Keep track of which rectangles are currently 
 game_end = False
 waiting_to_hide = False
 last_check_time = 0
+gray = (0,128,128)
 
 # Shuffle the colors
 random.shuffle(colors)
@@ -44,9 +45,19 @@ random.shuffle(colors)
 start_ticks = pygame.time.get_ticks()  # Starter tick
 font = pygame.font.Font("digital-7.ttf", 36)
 
+def draw_backgrounds():
+    top_menu = pygame.draw.rect(screen, gray, [0,0,screen_width, 50])
+    board = pygame.draw.rect(screen, (255,0,0), [0,50,screen_width, screen_height - 100])
+    bottom = pygame.draw.rect(screen, gray, [0,screen_height - 50,screen_width, 50])
+
+def draw_board():
+    
+
 # Main game loop
 while running:
     current_time = time.time()
+    screen.fill(background_color)
+    draw_backgrounds()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -72,13 +83,13 @@ while running:
         selected = []
         waiting_to_hide = False
 
-    screen.fill(background_color)
+    
 
     for i, rect in enumerate(rects):
         if revealed[i] or i in matched:
-            pygame.draw.rect(screen, colors[i], rect)
+            pygame.draw.rect(screen, colors[i], rect,0,10)
         else:
-            pygame.draw.rect(screen, (0, 0, 0), rect)  # Draw hidden rectangle
+            pygame.draw.rect(screen, (0, 0, 0), rect,0,10)  # Draw hidden rectangle
 
     if len(matched) == len(rects) and not game_end:
         game_end = True
