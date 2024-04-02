@@ -2,108 +2,134 @@ import pygame
 import random
 import time
 
-# Initialize Pygame
-pygame.init()
-pygame.mixer.init()  # Initialize the mixer module
+class MemoryGame:
+    def __init__(self):
+        pygame.init()
+        pygame.mixer.init()
 
-# Screen dimensions
-screen_width = 700
-screen_arena_width = 600
-screen_height = 500
-screen_arena_height = 400
-screen = pygame.display.set_mode((screen_width, screen_height))
+        # Screen dimensions
+        self.screen_width = 700
+        self.screen_height = 500
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        self.background_color = (255, 255, 255)
+        
+        # Colors and sounds
+        self.colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)] * 2
+        self.match_sound = pygame.mixer.Sound('Win.wav')
+        self.flip_sound = pygame.mixer.Sound('flip_sound.wav')
+        self.gray = (128, 128, 128)
 
-# Colors
-background_color = (255, 255, 255)
-colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
-colors *= 2  # Duplicate colors for pairs
 
-# Sounds
-match_sound = pygame.mixer.Sound('Win.wav')  # For a successful match
-flip_sound = pygame.mixer.Sound('flip_sound.wav')
+        # Game variables
+        self.grid_size = (4, 3)
+        self.rect_width = 600 // self.grid_size[0]
+        self.rect_height = 400 // self.grid_size[1]
+        self.rects = [pygame.Rect(x * self.rect_width + 60, y * self.rect_height + 60, self.rect_width - 20, self.rect_height - 20)
+                      for x in range(self.grid_size[0]) for y in range(self.grid_size[1])]
+        # random.shuffle(self.colors)
+        self.revealed = [False] * len(self.rects)
+        self.selected = []
+        self.matched = []
+        self.game_end = False
+        self.waiting_to_hide = False
+        self.last_check_time = 0
+        self.restart_button = pygame.Rect(10, self.screen_height - 40, 100, 20)
 
-# Positions and sizes
-grid_size = (4, 3)  # 4 columns, 3 rows
-rect_width = screen_arena_width // grid_size[0]
-rect_height = screen_arena_height // grid_size[1]
-rects = [pygame.Rect(x * rect_width + 50, y * rect_height + 50, rect_width-20, rect_height-20) for x in range(grid_size[0]) for y in range(grid_size[1])]
+         # Load images
+        image_paths = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png']
+        self.images = [pygame.transform.scale(pygame.image.load(path), (self.rect_width - 20, self.rect_height - 20)) for path in image_paths] * 2
+        random.shuffle(self.images)
 
-# Game variables
-selected = []  # Keep track of rectangles that are currently selected
-matched = []  # Keep track of rectangles that have been matched
-running = True
-revealed = [False] * len(rects)  # Keep track of which rectangles are currently revealed
-game_end = False
-waiting_to_hide = False
-last_check_time = 0
-gray = (0,128,128)
+        # Timer
+        self.start_ticks = pygame.time.get_ticks()
+        self.font = pygame.font.Font("digital-7.ttf", 36)
 
-# Shuffle the colors
-random.shuffle(colors)
+    def draw_backgrounds(self):
+        pygame.draw.rect(self.screen, self.gray, [0, 0, self.screen_width, 50])
+        pygame.draw.rect(self.screen, self.gray, [0, 50, self.screen_width, self.screen_height - 100])
+        pygame.draw.rect(self.screen, self.gray, [0, self.screen_height - 50, self.screen_width, 50])
 
-# Timer setup
-start_ticks = pygame.time.get_ticks()  # Starter tick
-font = pygame.font.Font("digital-7.ttf", 36)
+    def draw_board(self):
+        for i, rect in enumerate(self.rects):
+            if self.revealed[i] or i in self.matched:
+                self.screen.blit(self.images[i], rect.topleft)
+            else:
+                # Draw a black rectangle (or some background) for hidden tiles
+                pygame.draw.rect(self.screen, (0, 0, 0), rect, 0, 10)
+        pygame.draw.rect(self.screen, (255,255,255), self.restart_button, 0, 10)
 
-def draw_backgrounds():
-    top_menu = pygame.draw.rect(screen, gray, [0,0,screen_width, 50])
-    board = pygame.draw.rect(screen, (255,0,0), [0,50,screen_width, screen_height - 100])
-    bottom = pygame.draw.rect(screen, gray, [0,screen_height - 50,screen_width, 50])
+    def check_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if self.restart_button.collidepoint(event.pos):
+                    self.restart_game()
+                elif len(self.selected) < 2 and not self.waiting_to_hide:
+                    self.handle_click(event.pos)
+        return True
 
-def draw_board():
-    
+    def restart_game(self):
+        self.revealed = [False] * len(self.rects)
+        self.selected = []
+        self.matched = []
+        self.game_end = False
+        self.waiting_to_hide = False
+        self.last_check_time = 0
+        random.shuffle(self.images)
+        # Timer
+        self.start_ticks = pygame.time.get_ticks()
 
-# Main game loop
-while running:
-    current_time = time.time()
-    screen.fill(background_color)
-    draw_backgrounds()
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN and len(selected) < 2 and not waiting_to_hide:
-            mouse_pos = event.pos
-            for i, rect in enumerate(rects):
-                if rect.collidepoint(mouse_pos) and i not in matched and i not in selected:
-                    selected.append(i)
-                    revealed[i] = True
-                    flip_sound.play()
-                    if len(selected) == 2:
-                        if colors[selected[0]] != colors[selected[1]]:
-                            waiting_to_hide = True
-                            last_check_time = current_time
-                        else:
-                            match_sound.play()
-                            matched.extend(selected)
-                            selected = []
-    
-    if waiting_to_hide and current_time - last_check_time >= 0.5:  # 0.5 seconds passed
-        for i in selected:
-            revealed[i] = False
-        selected = []
-        waiting_to_hide = False
+    def handle_click(self, pos):
+        for i, rect in enumerate(self.rects):
+            if rect.collidepoint(pos) and i not in self.matched and i not in self.selected:
+                self.selected.append(i)
+                self.revealed[i] = True
+                self.flip_sound.play()
+                if len(self.selected) == 2:
+                    self.check_match()
 
-    
-
-    for i, rect in enumerate(rects):
-        if revealed[i] or i in matched:
-            pygame.draw.rect(screen, colors[i], rect,0,10)
+    def check_match(self):
+        if self.images[self.selected[0]] != self.images[self.selected[1]]:
+            self.waiting_to_hide = True
+            self.last_check_time = time.time()
         else:
-            pygame.draw.rect(screen, (0, 0, 0), rect,0,10)  # Draw hidden rectangle
+            self.match_sound.play()
+            self.matched.extend(self.selected)
+            self.selected = []
 
-    if len(matched) == len(rects) and not game_end:
-        game_end = True
-        elapsed_ticks = pygame.time.get_ticks() - start_ticks
-        elapsed_seconds = elapsed_ticks // 1000  # Convert milliseconds to seconds
+    def hide_non_matches(self):
+        if time.time() - self.last_check_time >= 0.5:
+            for i in self.selected:
+                self.revealed[i] = False
+            self.selected = []
+            self.waiting_to_hide = False
 
-    # Timer display
-    if(not game_end):
-        elapsed_ticks = pygame.time.get_ticks() - start_ticks
-        elapsed_seconds = elapsed_ticks // 1000  # Convert milliseconds to seconds
-    timer_text = f'Time: {elapsed_seconds // 60}:{elapsed_seconds % 60:02}'  # Format: "Time: M:SS"
-    timer_surface = font.render(timer_text, True, (0, 255, 0))
-    screen.blit(timer_surface, (5, 5))  # Position the timer at the top-left corner
+    def check_win_condition(self):
+        if len(self.matched) == len(self.rects) and not self.game_end:
+            self.game_end = True
 
-    pygame.display.flip()
+    def display_timer(self):
+        elapsed_ticks = pygame.time.get_ticks() - self.start_ticks
+        elapsed_seconds = elapsed_ticks // 1000
+        timer_text = f'Time: {elapsed_seconds // 60}:{elapsed_seconds % 60:02}'
+        timer_surface = self.font.render(timer_text, True, (0, 255, 0))
+        self.screen.blit(timer_surface, (5, 5))
 
-pygame.quit()
+    def run(self):
+        running = True
+        while running:
+            self.screen.fill(self.background_color)
+            self.draw_backgrounds()
+            self.draw_board()
+            running = self.check_events()
+            self.check_win_condition()
+            if self.waiting_to_hide:
+                self.hide_non_matches()
+            self.display_timer()
+            pygame.display.flip()
+        pygame.quit()
+
+if __name__ == "__main__":
+    game = MemoryGame()
+    game.run()
