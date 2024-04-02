@@ -34,6 +34,7 @@ class MemoryGame:
         self.waiting_to_hide = False
         self.last_check_time = 0
         self.restart_button = pygame.Rect(10, self.screen_height - 40, 100, 20)
+        self.play_again_button = pygame.Rect(self.screen_width/2, self.screen_height/2, 200, 100)
 
          # Load images
         image_paths = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png']
@@ -58,12 +59,19 @@ class MemoryGame:
                 pygame.draw.rect(self.screen, (0, 0, 0), rect, 0, 10)
         pygame.draw.rect(self.screen, (255,255,255), self.restart_button, 0, 10)
 
+    def win_menu(self):
+        # self.draw_backgrounds()
+        pygame.draw.rect(self.screen, (255,255,255), self.play_again_button, 0, 10)
+
+
     def check_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.restart_button.collidepoint(event.pos):
+                if self.game_end and self.play_again_button.collidepoint(event.pos):
+                    self.restart_game()
+                elif self.restart_button.collidepoint(event.pos):
                     self.restart_game()
                 elif len(self.selected) < 2 and not self.waiting_to_hide:
                     self.handle_click(event.pos)
@@ -121,7 +129,10 @@ class MemoryGame:
         while running:
             self.screen.fill(self.background_color)
             self.draw_backgrounds()
-            self.draw_board()
+            if self.game_end:
+                self.win_menu()
+            else:
+                self.draw_board()
             running = self.check_events()
             self.check_win_condition()
             if self.waiting_to_hide:
