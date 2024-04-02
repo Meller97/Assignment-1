@@ -20,6 +20,7 @@ colors *= 2  # Duplicate colors for pairs
 
 # Sounds
 match_sound = pygame.mixer.Sound('Win.wav')  # For a successful match
+flip_sound = pygame.mixer.Sound('flip_sound.wav')
 
 # Positions and sizes
 grid_size = (4, 3)  # 4 columns, 3 rows
@@ -55,6 +56,7 @@ while running:
                 if rect.collidepoint(mouse_pos) and i not in matched and i not in selected:
                     selected.append(i)
                     revealed[i] = True
+                    flip_sound.play()
                     if len(selected) == 2:
                         if colors[selected[0]] != colors[selected[1]]:
                             waiting_to_hide = True
