@@ -2,6 +2,26 @@ import pygame
 import random
 import time
 
+class Button:
+    def __init__(self, x, y, width, height, text=''):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.color = (255, 255, 255)  # Default color: white
+        self.text_color = (0, 0, 0)   # Text color: black
+        self.font = pygame.font.Font(None, 32)  # Default font
+
+    def draw(self, screen):
+        # Draw the button
+        pygame.draw.rect(screen, self.color, self.rect, 0, 10)
+        if self.text:
+            text_surface = self.font.render(self.text, True, self.text_color)
+            # Center the text on the button
+            text_rect = text_surface.get_rect(center=self.rect.center)
+            screen.blit(text_surface, text_rect)
+    
+    def is_clicked(self, event_pos):
+        return self.rect.collidepoint(event_pos)
+
 class MemoryGame:
     def __init__(self):
         pygame.init()
@@ -34,7 +54,7 @@ class MemoryGame:
         self.waiting_to_hide = False
         self.last_check_time = 0
         self.restart_button = pygame.Rect(10, self.screen_height - 40, 100, 20)
-        self.play_again_button = pygame.Rect(self.screen_width/2, self.screen_height/2, 200, 100)
+        self.play_again_button = Button(self.screen_width/2, self.screen_height/2, 200, 100, 'play again')
 
          # Load images
         image_paths = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png']
@@ -61,7 +81,7 @@ class MemoryGame:
 
     def win_menu(self):
         # self.draw_backgrounds()
-        pygame.draw.rect(self.screen, (255,255,255), self.play_again_button, 0, 10)
+        self.play_again_button.draw(self.screen)
 
 
     def check_events(self):
@@ -69,7 +89,7 @@ class MemoryGame:
             if event.type == pygame.QUIT:
                 return False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.game_end and self.play_again_button.collidepoint(event.pos):
+                if self.game_end and self.play_again_button.is_clicked(event.pos):
                     self.restart_game()
                 elif self.restart_button.collidepoint(event.pos):
                     self.restart_game()
