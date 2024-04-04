@@ -1,4 +1,5 @@
 import pygame
+import pygame.transform
 import random
 import time
 
@@ -156,6 +157,7 @@ class MemoryGame:
         # Colors and sounds
         self.colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255), (0, 255, 255)] * 2
         self.match_sound = pygame.mixer.Sound('Win.wav')
+        self.Lose_sound = pygame.mixer.Sound('Lose.wav')
         self.flip_sound = pygame.mixer.Sound('flip_sound.wav')
         self.gray = (128, 128, 128)
 
@@ -166,6 +168,7 @@ class MemoryGame:
         self.rect_height = 400 // self.grid_size[1]
         self.rects = [pygame.Rect(x * self.rect_width + 60, y * self.rect_height + 60, self.rect_width - 20, self.rect_height - 20)
                       for x in range(self.grid_size[0]) for y in range(self.grid_size[1])]
+        self.is_fliping = [False] * self.grid_size[0] * self.grid_size[1]
         # random.shuffle(self.colors)
         self.revealed = [False] * len(self.rects)
         self.selected = []
@@ -175,10 +178,15 @@ class MemoryGame:
         self.last_check_time = 0
         #self.restart_button = pygame.Rect(10, self.screen_height - 40, 100, 20)
         # mode menu endle
-        self.main_menu = Menu("memory", self.screen_width, self.screen_height, self.screen_width/4, self.screen_height/4,200, 50)
+        self.main_menu = Menu("memory", self.screen_width, self.screen_height, self.screen_width/20, self.screen_height/4,200, 50)
+        self.main_menu.add_button("Time Attack")
         self.main_menu.add_button("1 Player")
         self.main_menu.add_button("2 Players")
         self.in_main_menu = True
+
+        # attack mode
+        self.time_attack_mode = False
+        self.time_limit = 60  # Starting time limit for Time Attack mode
 
         self.rest_button = Button(10, self.screen_height - 40, 100, 30, 'rest')
         self.help_button = Button(200, 20, 300, 30, 'ask commander for help', False, "Lose.wav")
@@ -214,13 +222,22 @@ class MemoryGame:
         # pygame.draw.rect(self.screen, self.gray, [0, 50, self.screen_width, self.screen_height - 100])
         # pygame.draw.rect(self.screen, self.gray, [0, self.screen_height - 50, self.screen_width, 50])
 
+    def flip_tile(self, image, rect, angle):
+
+        rotated_image = pygame.transform.rotate(image, angle)
+        rotated_rect = rotated_image.get_rect(center=rect.center)
+        self.screen.blit(rotated_image, rotated_rect)
+
     def draw_board(self):
         for i, rect in enumerate(self.rects):
             if self.revealed[i] or i in self.matched:
-                self.screen.blit(self.images[i], rect.topleft)
+                if not self.is_fliping[i]:
+                    self.screen.blit(self.images[i], rect.topleft)
+                else:
+                    self.is_fliping[i] = False
             else:
                 # Draw a black rectangle (or some background) for hidden tiles
-                pygame.draw.rect(self.screen, self.current_player.color , rect, 0, 10)
+                pygame.draw.rect(self.screen, self.current_player.color, rect, 0, 10)
         self.rest_button.draw(self.screen)
         self.help_button.draw(self.screen)
 
@@ -239,19 +256,28 @@ class MemoryGame:
                 return False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if self.in_main_menu:
-                    if self.main_menu.button_is_clicked("1 Player",event.pos):
+                    if self.main_menu.button_is_clicked("Time Attack", event.pos):
+                        self.game_mode = 1  # Assuming single player for Time Attack
+                        self.time_attack_mode = True
+                        self.time_limit = 60  # Reset time limit for the first round
+                        self.in_main_menu = False
+                    elif self.main_menu.button_is_clicked("1 Player",event.pos):
                         self.game_mode = 1
+                        self.time_attack_mode = False
                         self.in_main_menu = False
                     elif self.main_menu.button_is_clicked("2 Players",event.pos):
                         self.game_mode = 2
                         self.add_player()
+                        self.time_attack_mode = False
                         self.in_main_menu = False
                 elif self.help_button.is_clicked(event.pos):
                     self.help_button.button_disable()
                     self.reveal_a_pair()
                 elif self.game_end and self.win_menu.button_is_clicked('play again',event.pos):
+                    self.time_attack_mode = False
                     self.restart_game()
                 elif self.rest_button.is_clicked(event.pos):
+                    self.time_attack_mode = False
                     self.restart_game()
                 elif len(self.selected) < 2 and not self.waiting_to_hide:
                     self.handle_click(event.pos)
@@ -263,7 +289,8 @@ class MemoryGame:
         self.matched = []
         self.game_end = False
         self.waiting_to_hide = False
-        self.in_main_menu = True
+        if not self.time_attack_mode:
+            self.in_main_menu = True
         self.current_player = Player(0)
         self.players  = [self.current_player]
         self.last_check_time = 0
@@ -272,12 +299,16 @@ class MemoryGame:
         self.current_player = self.players[0]
         # Timer
         self.start_ticks = pygame.time.get_ticks()
+        if self.time_attack_mode:
+            self.time_limit = max(10, self.time_limit - 5)  # Example: decrease time limit, but no less than 10 seconds
+            self.start_ticks = pygame.time.get_ticks()  # Reset the timer
 
     def handle_click(self, pos):
         for i, rect in enumerate(self.rects):
             if rect.collidepoint(pos) and i not in self.matched and i not in self.selected:
                 self.selected.append(i)
                 self.revealed[i] = True
+                self.is_fliping[i] = True
                 self.flip_sound.play()
                 if len(self.selected) == 2:
                     self.check_match()
@@ -301,7 +332,11 @@ class MemoryGame:
 
     def check_win_condition(self):
         if len(self.matched) == len(self.rects) and not self.game_end:
-            self.game_end = True
+            if self.time_attack_mode:
+                # Logic to restart the game with a shorter time limit
+                self.restart_game()
+            else:
+                self.game_end = True
 
     def reveal_a_pair(self):
         # Find a pair that has not been revealed or matched yet
@@ -331,6 +366,18 @@ class MemoryGame:
         timer_surface = self.font.render(timer_text, True, (0, 255, 0))
         self.screen.blit(timer_surface, (5, 5))
 
+    def display_time_attack_timer(self):
+        if self.time_attack_mode:
+            remaining_time = self.time_limit - (pygame.time.get_ticks() - self.start_ticks) // 1000
+            if remaining_time <= 0:
+                # Handle game over due to time running out
+                self.game_end = True 
+                self.Lose_sound.play()
+                # Here you could also trigger a transition to show the player's score or a "time's up" message
+            timer_text = f'Time Left: {max(0, remaining_time)}'
+            timer_surface = self.font.render(timer_text, True, (255, 0, 0))
+            self.screen.blit(timer_surface, (5, 5))
+
     def run(self):
         running = True
         while running:
@@ -347,7 +394,10 @@ class MemoryGame:
             if self.waiting_to_hide:
                 self.hide_non_matches()
             if not self.in_main_menu:
-                self.display_timer()
+                if self.time_attack_mode:
+                    self.display_time_attack_timer()
+                else:
+                    self.display_timer()
             pygame.display.flip()
         pygame.quit()
 
