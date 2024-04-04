@@ -3,15 +3,27 @@ import random
 import time
 
 class Button:
-    def __init__(self, x, y, width, height, text=''):
+    def __init__(self, x, y, width, height, text='', disabled = False, click_sound = "click.mp3"):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
         self.color = (255, 255, 255)  # Default color: white
         self.text_color = (0, 0, 0)   # Text color: black
         self.font = pygame.font.Font(None, 32)  # Default font
+        self.disabled = disabled # check if the button clickable'
+        self.click_sound = pygame.mixer.Sound(click_sound)
 
     def get_text(self):
         return self.text
+    
+    def button_disable(self):
+        self.disabled = True
+        self.color = (200, 200, 200)
+        self.text_color = (70, 70, 70)
+    
+    def button_enable(self):
+        self.disabled = False
+        self.color = (255, 255, 255)
+        self.text_color = (0, 0, 0)
     
     def draw(self, screen):
         # Draw the button
@@ -23,7 +35,13 @@ class Button:
             screen.blit(text_surface, text_rect)
     
     def is_clicked(self, event_pos):
-        return self.rect.collidepoint(event_pos)
+        if self.disabled:
+            return False
+        else:
+            check_click = self.rect.collidepoint(event_pos)
+            if check_click:
+                self.click_sound.play()
+            return check_click
 
 class Menu:
     def __init__(self, moving_text, menu_width, menu_height, x, y, width, height, gap=10, background_alpha=200):
@@ -110,8 +128,22 @@ class Menu:
         for button in self.buttons:
             button.draw(screen)
 
+class Player:
+    def __init__(self, player_number, score=0, color = (0,0,0)):
+        self.player_number = player_number
+        self.score = score
+        self.color = color
+
+    def update_score(self, points):
+        # Add points to the player's score
+        self.score += points
+
+    def reset_score(self):
+        # Reset the player's score to zero
+        self.score = 0
+
 class MemoryGame:
-    def __init__(self):
+    def __init__(self, game_mode = 1):
         pygame.init()
         pygame.mixer.init()
 
@@ -129,7 +161,7 @@ class MemoryGame:
 
 
         # Game variables
-        self.grid_size = (2, 2)
+        self.grid_size = (4, 4)
         self.rect_width = 600 // self.grid_size[0]
         self.rect_height = 400 // self.grid_size[1]
         self.rects = [pygame.Rect(x * self.rect_width + 60, y * self.rect_height + 60, self.rect_width - 20, self.rect_height - 20)
@@ -142,15 +174,29 @@ class MemoryGame:
         self.waiting_to_hide = False
         self.last_check_time = 0
         #self.restart_button = pygame.Rect(10, self.screen_height - 40, 100, 20)
+        # mode menu endle
+        self.main_menu = Menu("memory", self.screen_width, self.screen_height, self.screen_width/4, self.screen_height/4,200, 50)
+        self.main_menu.add_button("1 Player")
+        self.main_menu.add_button("2 Players")
+        self.in_main_menu = True
+
         self.rest_button = Button(10, self.screen_height - 40, 100, 30, 'rest')
+        self.help_button = Button(200, 20, 300, 30, 'ask commander for help', False, "Lose.wav")
         self.play_again_button = Button(self.screen_width/2 -100, self.screen_height-100, 200, 100, 'play again')
         self.win_menu =Menu("Well done!", self.screen_width, self.screen_height, self.screen_width/2, self.screen_height/2,200, 100)
         self.win_menu.add_button(None, self.play_again_button)
+        self.help = False
+        self.help_timer = 0
 
+        # players endle
+        self.game_mode = game_mode
+        self.current_player = Player(0)
+        self.players  = [self.current_player]
+        
 
          # Load images
-        image_paths = ['1.png', '2.png']
-        # image_paths = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png']
+        #image_paths = ['1.png', '2.png']
+        image_paths = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png']
         self.images = [pygame.transform.scale(pygame.image.load(path), (self.rect_width - 20, self.rect_height - 20)) for path in image_paths] * 2
         random.shuffle(self.images)
 
@@ -174,20 +220,36 @@ class MemoryGame:
                 self.screen.blit(self.images[i], rect.topleft)
             else:
                 # Draw a black rectangle (or some background) for hidden tiles
-                pygame.draw.rect(self.screen, (0, 0, 0), rect, 0, 10)
+                pygame.draw.rect(self.screen, self.current_player.color , rect, 0, 10)
         self.rest_button.draw(self.screen)
+        self.help_button.draw(self.screen)
 
     #def win_menu(self):
         # self.draw_backgrounds()
         #self.play_again_button.draw(self.screen)
 
+    def add_player(self):
+        if self.game_mode ==2:
+            self.players.append(Player(1, 0,(255, 0, 0)))
+            self.players[0].color = (0, 0, 255)
 
     def check_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.game_end and self.win_menu.button_is_clicked('play again',event.pos):
+                if self.in_main_menu:
+                    if self.main_menu.button_is_clicked("1 Player",event.pos):
+                        self.game_mode = 1
+                        self.in_main_menu = False
+                    elif self.main_menu.button_is_clicked("2 Players",event.pos):
+                        self.game_mode = 2
+                        self.add_player()
+                        self.in_main_menu = False
+                elif self.help_button.is_clicked(event.pos):
+                    self.help_button.button_disable()
+                    self.reveal_a_pair()
+                elif self.game_end and self.win_menu.button_is_clicked('play again',event.pos):
                     self.restart_game()
                 elif self.rest_button.is_clicked(event.pos):
                     self.restart_game()
@@ -201,8 +263,13 @@ class MemoryGame:
         self.matched = []
         self.game_end = False
         self.waiting_to_hide = False
+        self.in_main_menu = True
+        self.current_player = Player(0)
+        self.players  = [self.current_player]
         self.last_check_time = 0
         random.shuffle(self.images)
+        self.help_button.button_enable()
+        self.current_player = self.players[0]
         # Timer
         self.start_ticks = pygame.time.get_ticks()
 
@@ -219,6 +286,7 @@ class MemoryGame:
         if self.images[self.selected[0]] != self.images[self.selected[1]]:
             self.waiting_to_hide = True
             self.last_check_time = time.time()
+            self.current_player = self.players[(self.current_player.player_number + 1) % self.game_mode]
         else:
             self.match_sound.play()
             self.matched.extend(self.selected)
@@ -235,6 +303,26 @@ class MemoryGame:
         if len(self.matched) == len(self.rects) and not self.game_end:
             self.game_end = True
 
+    def reveal_a_pair(self):
+        # Find a pair that has not been revealed or matched yet
+        for i, image1 in enumerate(self.images):
+            if not self.revealed[i] and i not in self.matched:
+                for j, image2 in enumerate(self.images):
+                    if i != j and image1 == image2 and not self.revealed[j] and j not in self.matched:
+                        # Temporarily reveal the pair
+                        self.revealed[i] = True
+                        self.revealed[j] = True
+                        self.flip_sound.play()
+                        # Add a short delay to allow the player to memorize the pair
+                        self.draw_board()
+                        self.display_timer()
+                        pygame.display.flip()
+                        pygame.time.wait(500)  # Wait for 1 second
+                        # Hide the pair again
+                        self.revealed[i] = False
+                        self.revealed[j] = False
+                        return  # Exit after revealing one pair
+
     def display_timer(self):
         if not self.game_end:
             self.elapsed_ticks = pygame.time.get_ticks() - self.start_ticks
@@ -249,13 +337,17 @@ class MemoryGame:
             self.screen.fill(self.background_color)
             self.draw_backgrounds()
             self.draw_board()
+            if self.in_main_menu:
+                self.main_menu.draw(self.screen, False)
+                self.start_ticks = pygame.time.get_ticks()
             if self.game_end:
                 self.win_menu.draw(self.screen, True)
             running = self.check_events()
             self.check_win_condition()
             if self.waiting_to_hide:
                 self.hide_non_matches()
-            self.display_timer()
+            if not self.in_main_menu:
+                self.display_timer()
             pygame.display.flip()
         pygame.quit()
 
