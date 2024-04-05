@@ -3,6 +3,7 @@ import pygame.transform
 import random
 import time
 
+    
 class Button:
     def __init__(self, x, y, width, height, text='', disabled = False, click_sound = "click.mp3"):
         self.rect = pygame.Rect(x, y, width, height)
@@ -101,7 +102,7 @@ class Menu:
         # Create text surface with updated size
         font = pygame.font.Font(None, int(self.pulsing_text_size))
         text_surface = font.render(self.moving_text, True, self.pulsing_text_color)
-        text_rect = text_surface.get_rect(center=(self.menu_width // 2, self.menu_height // 2))
+        text_rect = text_surface.get_rect(center=(self.menu_width // 2, 80))
 
         # Draw the text
         screen.blit(text_surface, text_rect)
@@ -124,7 +125,7 @@ class Menu:
             # Blit the semi-transparent menu surface to the screen
             screen.blit(self.surface, (0, 0))
         else:
-            pygame.draw.rect(screen, (128,128,128), [0, 0, self.menu_width, self.menu_height])
+            pygame.draw.rect(screen, (72.9, 72.2, 42.4), [0, 0, self.menu_width, self.menu_height])
         self.update_and_draw_pulsing_text(screen)
         for button in self.buttons:
             button.draw(screen)
@@ -178,7 +179,7 @@ class MemoryGame:
         self.last_check_time = 0
         #self.restart_button = pygame.Rect(10, self.screen_height - 40, 100, 20)
         # mode menu endle
-        self.main_menu = Menu("memory", self.screen_width, self.screen_height, self.screen_width/20, self.screen_height/4,200, 50)
+        self.main_menu = Menu("IDF memory game", self.screen_width, self.screen_height, self.screen_width/20, self.screen_height/3,200, 50)
         self.main_menu.add_button("Time Attack")
         self.main_menu.add_button("1 Player")
         self.main_menu.add_button("2 Players")
@@ -217,7 +218,7 @@ class MemoryGame:
         if transparent:
             pygame.draw.rect(transparent, self.gray, [0, 0, self.screen_width, self.screen_height])
         else:
-            pygame.draw.rect(self.screen, self.gray, [0, 0, self.screen_width, self.screen_height])
+            pygame.draw.rect(self.screen, (72.9, 72.2, 42.4), [0, 0, self.screen_width, self.screen_height])
         # pygame.draw.rect(self.screen, self.gray, [0, 0, self.screen_width, 50])
         # pygame.draw.rect(self.screen, self.gray, [0, 50, self.screen_width, self.screen_height - 100])
         # pygame.draw.rect(self.screen, self.gray, [0, self.screen_height - 50, self.screen_width, 50])
