@@ -1,7 +1,13 @@
+from vosk import Model, KaldiRecognizer
+import os
+import sys
+import json
+import pyaudio
 import pygame
 import pygame.transform
 import random
 import time
+
 
     
 class Button:
@@ -162,6 +168,13 @@ class MemoryGame:
         self.flip_sound = pygame.mixer.Sound('flip_sound.wav')
         self.gray = (128, 128, 128)
 
+        # Load the Vosk model
+        self.model_path = "vosk-model-small-en-us-0.15"
+        if not os.path.exists(self.model_path):
+            print("Please download the model from https://alphacephei.com/vosk/models and unpack as 'model' in the current folder.")
+            exit(1)
+        self.model = Model(self.model_path)
+        self.stream_start = False
 
         # Game variables
         self.grid_size = (4, 4)
@@ -183,6 +196,8 @@ class MemoryGame:
         self.main_menu.add_button("Time Attack")
         self.main_menu.add_button("1 Player")
         self.main_menu.add_button("2 Players")
+        self.voice_button = Button(self.screen_width/20 + 210, self.screen_height/3 +60, 200, 50, 'Voice Control')
+        self.main_menu.add_button(None, self.voice_button)
         self.in_main_menu = True
 
         # attack mode
@@ -199,14 +214,15 @@ class MemoryGame:
 
         # players endle
         self.game_mode = game_mode
+        self.voice_control_mode = False
         self.current_player = Player(0)
         self.players  = [self.current_player]
         
 
          # Load images
         #image_paths = ['1.png', '2.png']
-        image_paths = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png']
-        self.images = [pygame.transform.scale(pygame.image.load(path), (self.rect_width - 20, self.rect_height - 20)) for path in image_paths] * 2
+        self.image_paths = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png']
+        self.images = [pygame.transform.scale(pygame.image.load(path), (self.rect_width - 20, self.rect_height - 20)) for path in self.image_paths] * 2
         random.shuffle(self.images)
 
         # Timer
@@ -239,6 +255,11 @@ class MemoryGame:
             else:
                 # Draw a black rectangle (or some background) for hidden tiles
                 pygame.draw.rect(self.screen, self.current_player.color, rect, 0, 10)
+                text_surface = self.font.render(str(i+1), True, (255, 255, 255))
+                # Center the text on the button
+                text_rect = text_surface.get_rect(center=rect.center)
+                self.screen.blit(text_surface, text_rect)
+
         self.rest_button.draw(self.screen)
         self.help_button.draw(self.screen)
 
@@ -271,6 +292,12 @@ class MemoryGame:
                         self.add_player()
                         self.time_attack_mode = False
                         self.in_main_menu = False
+                    # Check if Voice Control button is clicked
+                    elif self.main_menu.button_is_clicked("Voice Control", event.pos):
+                        self.game_mode = 1
+                        self.time_attack_mode = False
+                        self.in_main_menu = False
+                        self.voice_control_mode = True
                 elif self.help_button.is_clicked(event.pos):
                     self.help_button.button_disable()
                     self.reveal_a_pair()
@@ -290,6 +317,7 @@ class MemoryGame:
         self.matched = []
         self.game_end = False
         self.waiting_to_hide = False
+        self.voice_control_mode = False
         if not self.time_attack_mode:
             self.in_main_menu = True
         self.current_player = Player(0)
@@ -350,6 +378,8 @@ class MemoryGame:
                         self.revealed[j] = True
                         self.flip_sound.play()
                         # Add a short delay to allow the player to memorize the pair
+                        self.screen.fill(self.background_color)
+                        self.draw_backgrounds()
                         self.draw_board()
                         self.display_timer()
                         pygame.display.flip()
@@ -358,6 +388,38 @@ class MemoryGame:
                         self.revealed[i] = False
                         self.revealed[j] = False
                         return  # Exit after revealing one pair
+
+    def voice_control_start(self):
+        # Setup for voice recognition
+        rec = KaldiRecognizer(self.model, 16000)
+        p = pyaudio.PyAudio()
+        stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=8000)
+        stream.start_stream()
+        self.stream_start = True
+
+        print("Voice control mode started. Say a card number to flip...")
+        return rec, stream
+
+
+    def voice_control_read(self, stream, rec):
+        data = stream.read(4000, exception_on_overflow=False)
+        if len(data) == 0:
+            return
+        if rec.AcceptWaveform(data):
+            result = json.loads(rec.Result())
+            print(result)
+            if 'text' in result:
+                try:
+                    card_number = int(result['text'])
+                    if 1 <= card_number <= len(self.rects):
+                        self.handle_click(self.number_to_tile_pos(card_number))
+                except ValueError:
+                    pass
+
+    def number_to_tile_pos(self, tile_number):
+        for i, rect in enumerate(self.rects):
+            if(tile_number == i+1):
+                return rect.center
 
     def display_timer(self):
         if not self.game_end:
@@ -390,6 +452,11 @@ class MemoryGame:
                 self.start_ticks = pygame.time.get_ticks()
             if self.game_end:
                 self.win_menu.draw(self.screen, True)
+
+            # handle Voice control feature
+            if self.voice_control_mode and len(self.selected) < 2 and not self.waiting_to_hide:
+                rec, stream = self.voice_control_start()
+                self.voice_control_read(stream, rec)
             running = self.check_events()
             self.check_win_condition()
             if self.waiting_to_hide:
