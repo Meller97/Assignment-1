@@ -175,6 +175,11 @@ class MemoryGame:
             exit(1)
         self.model = Model(self.model_path)
         self.stream_start = False
+        self.number_words = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+                        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+                        'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14,
+                        'fifteen': 15, 'sixteen': 16, 'seventeen': 17, 'eighteen': 18,
+                        'nineteen': 19, 'twenty': 20}
 
         # Game variables
         self.grid_size = (4, 4)
@@ -199,6 +204,10 @@ class MemoryGame:
         self.voice_button = Button(self.screen_width/20 + 210, self.screen_height/3 +60, 200, 50, 'Voice Control')
         self.main_menu.add_button(None, self.voice_button)
         self.in_main_menu = True
+
+
+        # flip array to store the stage in the flip for every tile when 0 is face down and 10 is face up
+        self.flip_arry = [0]*(self.grid_size[0]*self.grid_size[1])
 
         # attack mode
         self.time_attack_mode = False
@@ -407,14 +416,16 @@ class MemoryGame:
             return
         if rec.AcceptWaveform(data):
             result = json.loads(rec.Result())
-            print(result)
+            #print(result)
             if 'text' in result:
                 try:
-                    card_number = int(result['text'])
-                    if 1 <= card_number <= len(self.rects):
+                    card_number = self.number_words.get(result['text'].lower(), None)
+                    print(card_number)
+
+                    if card_number is not None and 1 <= card_number <= len(self.rects):
                         self.handle_click(self.number_to_tile_pos(card_number))
                 except ValueError:
-                    pass
+                    print("not work")
 
     def number_to_tile_pos(self, tile_number):
         for i, rect in enumerate(self.rects):
@@ -455,7 +466,8 @@ class MemoryGame:
 
             # handle Voice control feature
             if self.voice_control_mode and len(self.selected) < 2 and not self.waiting_to_hide:
-                rec, stream = self.voice_control_start()
+                if not self.stream_start:
+                    rec, stream = self.voice_control_start()
                 self.voice_control_read(stream, rec)
             running = self.check_events()
             self.check_win_condition()
