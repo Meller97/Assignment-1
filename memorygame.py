@@ -213,7 +213,7 @@ class MemoryGame:
         self.time_attack_mode = False
         self.time_limit = 60  # Starting time limit for Time Attack mode
 
-        self.rest_button = Button(10, self.screen_height - 40, 100, 30, 'rest')
+        self.rest_button = Button(10, self.screen_height - 40, 100, 30, 'reset')
         self.help_button = Button(200, 20, 300, 30, 'ask commander for help', False, "Lose.wav")
         self.play_again_button = Button(self.screen_width/2 -100, self.screen_height-100, 200, 100, 'play again')
         self.win_menu =Menu("Well done!", self.screen_width, self.screen_height, self.screen_width/2, self.screen_height/2,200, 100)
@@ -313,10 +313,10 @@ class MemoryGame:
                 elif self.game_end and self.win_menu.button_is_clicked('play again',event.pos):
                     self.time_attack_mode = False
                     self.restart_game()
-                elif self.rest_button.is_clicked(event.pos):
+                elif not self.game_end and self.rest_button.is_clicked(event.pos):
                     self.time_attack_mode = False
                     self.restart_game()
-                elif len(self.selected) < 2 and not self.waiting_to_hide:
+                elif not self.game_end and len(self.selected) < 2 and not self.waiting_to_hide:
                     self.handle_click(event.pos)
         return True
 
@@ -449,7 +449,10 @@ class MemoryGame:
                 self.Lose_sound.play()
                 # Here you could also trigger a transition to show the player's score or a "time's up" message
             timer_text = f'Time Left: {max(0, remaining_time)}'
-            timer_surface = self.font.render(timer_text, True, (255, 0, 0))
+            if remaining_time <= 10:
+                timer_surface = self.font.render(timer_text, True, (255, 0, 0))
+            else:
+                timer_surface = self.font.render(timer_text, True, (0, 255, 0))
             self.screen.blit(timer_surface, (5, 5))
 
     def run(self):
