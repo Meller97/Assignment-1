@@ -11,10 +11,10 @@ import time
 
     
 class Button:
-    def __init__(self, x, y, width, height, text='', disabled = False, click_sound = "click.mp3", image=None):
+    def __init__(self, x, y, width, height, text='', disabled = False, click_sound = "click.mp3", image=None, color = (255, 255, 255)):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
-        self.color = (255, 255, 255)  # Default color: white
+        self.color = color  # Default color: white
         self.text_color = (0, 0, 0)   # Text color: black
         self.font = pygame.font.Font(None, 32)  # Default font
         self.disabled = disabled # check if the button clickable'
@@ -177,7 +177,6 @@ class MemoryGame:
         # Load the Vosk model
         self.model_path = "vosk-model-small-en-us-0.15"
         if not os.path.exists(self.model_path):
-            print("Please download the model from https://alphacephei.com/vosk/models and unpack as 'model' in the current folder.")
             exit(1)
         self.model = Model(self.model_path)
         self.stream_start = False
@@ -222,11 +221,14 @@ class MemoryGame:
         self.time_limit = 60  # Starting time limit for Time Attack mode
 
         self.rest_button = Button(10, self.screen_height - 40, 100, 30, 'reset')
-        self.help_button = Button(200, 20, 300, 30, 'help', False, "Lose.wav",'helper.png' )
+        self.help_button = Button(200, 20, 300, 30, 'help', False, "Lose.wav",'helper.png')
         self.play_again_button = Button(self.screen_width/2 -100, self.screen_height-100, 200, 100, 'play again')
+        self.Mute_button = Button(self.screen_width-40, 10, 30, 30, 'Mute', False, "click.mp3", "mute.png", (72.9, 72.2, 42.4))
         self.win_menu =Menu("Well done!", self.screen_width, self.screen_height, self.screen_width/2, self.screen_height/2,200, 100)
         self.win_menu.add_button(None, self.play_again_button)
         self.help = False
+        self.is_mute = False
+        self.sound_paused = False
         self.help_timer = 0
 
         # players endle
@@ -274,9 +276,12 @@ class MemoryGame:
             if self.revealed[i] or i in self.matched:
                 if not self.is_fliping[i]:
                     # flip revealed tile
-                    if(self.combined_images[i][len(self.combined_images[i])-1] < (len(self.combined_images[i])-1)*100):
+                    if self.combined_images[i][len(self.combined_images[i])-1] < (len(self.combined_images[i])-1)*100:
                         self.screen.blit(self.combined_images[i][int((self.combined_images[i][len(self.combined_images[i])-1])/100)], rect.topleft)
-                        self.combined_images[i][len(self.combined_images[i])-1] += 1
+                        jump = 1
+                        if self.voice_control_mode == True:
+                            jump = 50
+                        self.combined_images[i][len(self.combined_images[i])-1] += jump
                     else:
                         self.screen.blit(self.combined_images[i][len(self.combined_images[i])-2], rect.topleft)
                 else:
@@ -308,6 +313,11 @@ class MemoryGame:
                 return False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if self.in_main_menu:
+                    if self.Mute_button.is_clicked(event.pos):
+                        if(not self.sound_paused):
+                            self.is_mute = True
+                        else:
+                            self.is_mute = False
                     if self.main_menu.button_is_clicked("Time Attack", event.pos):
                         self.game_mode = 1  # Assuming single player for Time Attack
                         self.time_attack_mode = True
@@ -435,7 +445,7 @@ class MemoryGame:
         stream.start_stream()
         self.stream_start = True
 
-        print("Voice control mode started. Say a card number to flip...")
+        #print("Voice control mode started. Say a card number to flip...")
         return rec, stream
 
 
@@ -449,12 +459,11 @@ class MemoryGame:
             if 'text' in result:
                 try:
                     card_number = self.number_words.get(result['text'].lower(), None)
-                    print(card_number)
 
                     if card_number is not None and 1 <= card_number <= len(self.rects):
                         self.handle_click(self.number_to_tile_pos(card_number))
                 except ValueError:
-                    print("not work")
+                    pass
 
     def number_to_tile_pos(self, tile_number):
         for i, rect in enumerate(self.rects):
@@ -487,6 +496,15 @@ class MemoryGame:
     def run(self):
         running = True
         while running:
+            if self.is_mute:
+                if(not self.sound_paused):
+                    pygame.mixer.pause()
+                    self.sound_paused = True
+            else:
+                if self.sound_paused:
+                    pygame.mixer.unpause()
+                    self.sound_paused = False
+                    
             self.screen.fill(self.background_color)
             self.draw_backgrounds()
             self.draw_board()
@@ -494,6 +512,7 @@ class MemoryGame:
                 self.main_menu.draw(self.screen, False)
                 self.start_ticks = pygame.time.get_ticks()
                 self.start_sound.play()
+                self.Mute_button.draw(self.screen)
             else:
                 self.start_sound.stop()
             if self.game_end:
