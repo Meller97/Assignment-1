@@ -231,8 +231,20 @@ class MemoryGame:
          # Load images
         #image_paths = ['1.png', '2.png']
         self.image_paths = ['1.png', '2.png', '3.png', '4.png', '5.png', '6.png', '7.png', '8.png']
-        self.images = [pygame.transform.scale(pygame.image.load(path), (self.rect_width - 20, self.rect_height - 20)) for path in self.image_paths] * 2
+        self.images = [pygame.transform.scale(pygame.image.load(path), (10, self.rect_height - 20)) for path in self.image_paths] * 2
+        self.images1 = [pygame.transform.scale(pygame.image.load(path), (self.rect_width - 80, self.rect_height - 20)) for path in self.image_paths] * 2
+        self.images2 = [pygame.transform.scale(pygame.image.load(path), (self.rect_width - 40, self.rect_height - 20)) for path in self.image_paths] * 2
+        self.images3 = [pygame.transform.scale(pygame.image.load(path), (self.rect_width - 20, self.rect_height - 20)) for path in self.image_paths] * 2
+        self.image_stage =[0]*16
+        
+        # Zip the lists to combine corresponding elements from each list into tuples
+        self.combined_images = list(zip(self.images, self.images1, self.images2, self.images3, self.image_stage))
+
+        # Since zip creates tuples, convert each tuple to a list
+        self.combined_images = [list(group) for group in self.combined_images]
+        random.shuffle(self.combined_images)
         random.shuffle(self.images)
+        
 
         # Timer
         self.start_ticks = pygame.time.get_ticks()
@@ -258,10 +270,16 @@ class MemoryGame:
         for i, rect in enumerate(self.rects):
             if self.revealed[i] or i in self.matched:
                 if not self.is_fliping[i]:
-                    self.screen.blit(self.images[i], rect.topleft)
+                    # flip revealed tile
+                    if(self.combined_images[i][len(self.combined_images[i])-1] < (len(self.combined_images[i])-1)*100):
+                        self.screen.blit(self.combined_images[i][int((self.combined_images[i][len(self.combined_images[i])-1])/100)], rect.topleft)
+                        self.combined_images[i][len(self.combined_images[i])-1] += 1
+                    else:
+                        self.screen.blit(self.combined_images[i][len(self.combined_images[i])-2], rect.topleft)
                 else:
                     self.is_fliping[i] = False
             else:
+                self.combined_images[i][len(self.combined_images[i])-1] = 0
                 # Draw a black rectangle (or some background) for hidden tiles
                 pygame.draw.rect(self.screen, self.current_player.color, rect, 0, 10)
                 text_surface = self.font.render(str(i+1), True, (255, 255, 255))
@@ -332,6 +350,7 @@ class MemoryGame:
         self.current_player = Player(0)
         self.players  = [self.current_player]
         self.last_check_time = 0
+        random.shuffle(self.combined_images)
         random.shuffle(self.images)
         self.help_button.button_enable()
         self.current_player = self.players[0]
@@ -352,7 +371,7 @@ class MemoryGame:
                     self.check_match()
 
     def check_match(self):
-        if self.images[self.selected[0]] != self.images[self.selected[1]]:
+        if self.combined_images[self.selected[0]][0] != self.combined_images[self.selected[1]][0]:
             self.waiting_to_hide = True
             self.last_check_time = time.time()
             self.current_player = self.players[(self.current_player.player_number + 1) % self.game_mode]
@@ -378,10 +397,10 @@ class MemoryGame:
 
     def reveal_a_pair(self):
         # Find a pair that has not been revealed or matched yet
-        for i, image1 in enumerate(self.images):
+        for i, image1 in enumerate(self.combined_images):
             if not self.revealed[i] and i not in self.matched:
-                for j, image2 in enumerate(self.images):
-                    if i != j and image1 == image2 and not self.revealed[j] and j not in self.matched:
+                for j, image2 in enumerate(self.combined_images):
+                    if i != j and image1[0] == image2[0] and not self.revealed[j] and j not in self.matched:
                         # Temporarily reveal the pair
                         self.revealed[i] = True
                         self.revealed[j] = True
