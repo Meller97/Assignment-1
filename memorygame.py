@@ -11,7 +11,7 @@ import time
 
     
 class Button:
-    def __init__(self, x, y, width, height, text='', disabled = False, click_sound = "click.mp3"):
+    def __init__(self, x, y, width, height, text='', disabled = False, click_sound = "click.mp3", image=None):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
         self.color = (255, 255, 255)  # Default color: white
@@ -19,6 +19,7 @@ class Button:
         self.font = pygame.font.Font(None, 32)  # Default font
         self.disabled = disabled # check if the button clickable'
         self.click_sound = pygame.mixer.Sound(click_sound)
+        self.image = pygame.image.load(image) if image else None
 
     def get_text(self):
         return self.text
@@ -36,7 +37,11 @@ class Button:
     def draw(self, screen):
         # Draw the button
         pygame.draw.rect(screen, self.color, self.rect, 0, 10)
-        if self.text:
+        if self.image:
+            # Resize image to fit the button
+            image_surface = pygame.transform.scale(self.image, (self.rect.width, self.rect.height))
+            screen.blit(image_surface, self.rect)
+        elif self.text:
             text_surface = self.font.render(self.text, True, self.text_color)
             # Center the text on the button
             text_rect = text_surface.get_rect(center=self.rect.center)
@@ -166,6 +171,7 @@ class MemoryGame:
         self.match_sound = pygame.mixer.Sound('Win.wav')
         self.Lose_sound = pygame.mixer.Sound('Lose.wav')
         self.flip_sound = pygame.mixer.Sound('flip_sound.wav')
+        self.start_sound = pygame.mixer.Sound('IDF.mp3')
         self.gray = (128, 128, 128)
 
         # Load the Vosk model
@@ -191,9 +197,11 @@ class MemoryGame:
         # random.shuffle(self.colors)
         self.revealed = [False] * len(self.rects)
         self.selected = []
+        self.selected_for_help = []
         self.matched = []
         self.game_end = False
         self.waiting_to_hide = False
+        self.waiting_to_hide_help = False
         self.last_check_time = 0
         #self.restart_button = pygame.Rect(10, self.screen_height - 40, 100, 20)
         # mode menu endle
@@ -214,7 +222,7 @@ class MemoryGame:
         self.time_limit = 60  # Starting time limit for Time Attack mode
 
         self.rest_button = Button(10, self.screen_height - 40, 100, 30, 'reset')
-        self.help_button = Button(200, 20, 300, 30, 'ask commander for help', False, "Lose.wav")
+        self.help_button = Button(200, 20, 300, 30, 'help', False, "Lose.wav",'helper.png' )
         self.play_again_button = Button(self.screen_width/2 -100, self.screen_height-100, 200, 100, 'play again')
         self.win_menu =Menu("Well done!", self.screen_width, self.screen_height, self.screen_width/2, self.screen_height/2,200, 100)
         self.win_menu.add_button(None, self.play_again_button)
@@ -260,11 +268,6 @@ class MemoryGame:
         # pygame.draw.rect(self.screen, self.gray, [0, 50, self.screen_width, self.screen_height - 100])
         # pygame.draw.rect(self.screen, self.gray, [0, self.screen_height - 50, self.screen_width, 50])
 
-    def flip_tile(self, image, rect, angle):
-
-        rotated_image = pygame.transform.rotate(image, angle)
-        rotated_rect = rotated_image.get_rect(center=rect.center)
-        self.screen.blit(rotated_image, rotated_rect)
 
     def draw_board(self):
         for i, rect in enumerate(self.rects):
@@ -325,7 +328,7 @@ class MemoryGame:
                         self.time_attack_mode = False
                         self.in_main_menu = False
                         self.voice_control_mode = True
-                elif self.help_button.is_clicked(event.pos):
+                elif not self.game_end and self.help_button.is_clicked(event.pos):
                     self.help_button.button_disable()
                     self.reveal_a_pair()
                 elif self.game_end and self.win_menu.button_is_clicked('play again',event.pos):
@@ -379,6 +382,10 @@ class MemoryGame:
             self.match_sound.play()
             self.matched.extend(self.selected)
             self.selected = []
+    
+    def check_match_help(self):
+        self.waiting_to_hide_help = True
+        self.last_check_time = time.time()
 
     def hide_non_matches(self):
         if time.time() - self.last_check_time >= 0.5:
@@ -386,6 +393,13 @@ class MemoryGame:
                 self.revealed[i] = False
             self.selected = []
             self.waiting_to_hide = False
+
+    def hide_non_matches_help(self):
+        if time.time() - self.last_check_time >= 0.9:
+            for i in self.selected_for_help:
+                self.revealed[i] = False
+            self.selected_for_help = []
+            self.waiting_to_hide_help = False
 
     def check_win_condition(self):
         if len(self.matched) == len(self.rects) and not self.game_end:
@@ -405,16 +419,12 @@ class MemoryGame:
                         self.revealed[i] = True
                         self.revealed[j] = True
                         self.flip_sound.play()
-                        # Add a short delay to allow the player to memorize the pair
-                        self.screen.fill(self.background_color)
-                        self.draw_backgrounds()
-                        self.draw_board()
-                        self.display_timer()
-                        pygame.display.flip()
-                        pygame.time.wait(500)  # Wait for 1 second
-                        # Hide the pair again
-                        self.revealed[i] = False
-                        self.revealed[j] = False
+
+                        self.selected_for_help.append(i)
+                        self.selected_for_help.append(j)
+                        self.check_match_help()
+                        
+
                         return  # Exit after revealing one pair
 
     def voice_control_start(self):
@@ -483,6 +493,9 @@ class MemoryGame:
             if self.in_main_menu:
                 self.main_menu.draw(self.screen, False)
                 self.start_ticks = pygame.time.get_ticks()
+                self.start_sound.play()
+            else:
+                self.start_sound.stop()
             if self.game_end:
                 self.win_menu.draw(self.screen, True)
 
@@ -495,6 +508,8 @@ class MemoryGame:
             self.check_win_condition()
             if self.waiting_to_hide:
                 self.hide_non_matches()
+            if self.waiting_to_hide_help:
+                self.hide_non_matches_help()
             if not self.in_main_menu:
                 if self.time_attack_mode:
                     self.display_time_attack_timer()
